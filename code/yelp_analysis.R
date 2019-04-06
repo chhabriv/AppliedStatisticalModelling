@@ -5,7 +5,9 @@ library("ggplot2")
 #install.packages("MCMCpack")
 library("MCMCpack")
 
-DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
+#DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
+DATA_PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/dataset/"
+VISUALS="visuals/"
 BUSINESS_TORONTO_FILE="Business_Toronto_Restaurant.json"
 REVIEW_TORONTO="Review_Toronto_Restaurant.json"
 NEIGHBORHOOD_1="Scarborough"
@@ -155,9 +157,35 @@ ggplot(data.frame(y1_sim, y2_sim)) + geom_point(aes(y1_sim, y2_sim,col=TRUE, alp
 
 
 #Multiple Models
-business$neighborhood_indicator <- as.numeric(factor(business$neighborhood))
+business_with_neighborhood=subset(business,business$neighborhood!="")
+business_with_neighborhood$neighborhood_indicator = as.numeric(factor(business_with_neighborhood$neighborhood))
 #Think about how to show this
-ggplot(business) + geom_boxplot(aes(x = reorder(neighborhood_indicator, stars, median), 
+ggplot(business_with_neighborhood) + 
+  geom_boxplot(aes(x = reorder(neighborhood_indicator, stars, median), 
                                     stars, 
                                     fill = reorder(neighborhood_indicator, stars, median)), show.legend=FALSE)
-ggplot(business, aes(x = reorder(neighborhood_indicator, stars, length))) + stat_count()
+ggplot(business_with_neighborhood, 
+       aes(x = reorder(neighborhood_indicator, stars, length))) + stat_count()
+
+ggplot(business_with_neighborhood, aes(stars)) + stat_bin(bins = 10)
+
+avg_size=data.frame(size=tapply(business_with_neighborhood$stars, 
+           business_with_neighborhood$neighborhood, length))
+avg_size$neighborhood=row.names(avg_size)
+avg_mean_rating=data.frame(mean_rating=tapply(business_with_neighborhood$stars, 
+                business_with_neighborhood$neighborhood, mean))
+avg_mean_rating$neighborhood=row.names(avg_mean_rating)
+
+avg=merge(avg_size,avg_mean_rating,by.x=NEIGHBORHOOD_COLUMN,
+          by.y=NEIGHBORHOOD_COLUMN)
+ggplot(avg, 
+       aes(as.numeric(factor(neighborhood)), mean_rating))+
+  geom_point(aes(size=size))+
+  scale_x_continuous(breaks=row_number(avg$size))
+
+ggplot(avg, 
+       aes(size, mean_rating,col=(factor(neighborhood))))+
+  geom_point()
+
+
+             

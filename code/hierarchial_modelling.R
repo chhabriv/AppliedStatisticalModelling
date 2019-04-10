@@ -1,12 +1,11 @@
 library("jsonlite")
 library("ggplot2")
 library("readr")
-library("ggplot2")
 #install.packages("MCMCpack")
 library("MCMCpack")
 
-#DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
-DATA_PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/dataset/"
+DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
+#DATA_PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/dataset/"
 VISUALS="visuals/"
 BUSINESS_TORONTO_FILE="Business_Toronto_Restaurant.json"
 REVIEW_TORONTO="Review_Toronto_Restaurant.json"
@@ -23,10 +22,12 @@ INITIAL_DIFFERENCE=0
 A_0=4
 B_0=1.6
 ITERATIONS=5000
+KAPPA=2
 
 INDIA_NEIGHBORHOOD_DISTRIBUTION="INDIAN RESTAURANT RATING DISTRIBUTION PER NEIGHBORHOOD"
 INDIAN_NEIGHBORHOOD_RATING="INDIAN RESTAURANTS COUNT OF RATINGS PER NEIGHBORHOOD"
 HISTOGRAM_DIFF_SIM_NEIGHBORHOOD_RATINGS="INDIAN RESTAURANT SIMULATED RATING DIFFERENCE"
+MEAN_SAMPLE_RATING_VS_NUMBER_RESTAURANTS_NEIGHBORHOOD="MEAN RATING FROM SAMPLES VS NUMBER OF RESTAURANTS PER NEIGHBORHOOD"
 
 BUSINESS_TORONTO=paste(DATA_PATH,BUSINESS_TORONTO_FILE,sep = "")
 
@@ -68,7 +69,7 @@ for(i in c(1:nrow(business))){
 }
 }
 
-indian_restaurants=subset(business,IndianFlag==1 & (neighborhood==NEIGHBORHOOD_1 | neighborhood==NEIGHBORHOOD_2))
+indian_restaurants=subset(business,IndianFlag==1 & (neighborhood==NEIGHBORHOOD_1 | neighborhood==NEIGHBORHOOD_2) & is_open==1)
 
 ggplot(indian_restaurants) + geom_boxplot(aes(neighborhood, stars, fill = neighborhood)) + 
   geom_jitter(aes(neighborhood, stars, shape = neighborhood))+
@@ -181,11 +182,88 @@ avg=merge(avg_size,avg_mean_rating,by.x=NEIGHBORHOOD_COLUMN,
 ggplot(avg, 
        aes(as.numeric(factor(neighborhood)), mean_rating))+
   geom_point(aes(size=size))+
-  scale_x_continuous(breaks=row_number(avg$size))
+  scale_x_continuous(breaks=row.number(avg$size))
 
 ggplot(avg, 
        aes(size, mean_rating,col=(factor(neighborhood))))+
   geom_point()
 
 
-             
+gibbs_sampler_multiple <- function(y, ind, maxiter = ITERATIONS)
+{
+  ### weakly informative priors
+  a0 <- KAPPA ; b0 <- KAPPA*(INITIAL_VARIANCE^2) ## tau_w hyperparameters
+  eta0 <-KAPPA ; t0 <-KAPPA*(INITIAL_VARIANCE^2) ## tau_b hyperparameters
+  mu0<-INITIAL_MEAN ; gamma0 <- 1/INITIAL_VARIANCE
+  ###
+  
+
+  ### starting values
+  m <- nlevels(ind)
+  ybar <- theta <- tapply(y, ind, mean)
+  a <- tapply(y, ind, var)
+  tau_w <- mean(1 / tapply(y, ind, var)) ##within group precision
+  mu <- mean(theta)
+  tau_b <-var(theta) ##between group precision
+  n_m <- tapply(y, ind, length)
+  an <- a0 + sum(n_m)/2
+  ###
+  
+  ### setup MCMC
+  theta_mat <- matrix(0, nrow=maxiter, ncol=m)
+  mat_store <- matrix(0, nrow=maxiter, ncol=3)
+  ###
+  
+  ### MCMC algorithm
+  for(s in 1:maxiter) 
+  {
+    
+    # sample new values of the thetas
+    for(j in 1:m) 
+    {
+      taun <- n_m[j] * tau_w + tau_b
+      #print(tau_w)
+      thetan <- (ybar[j] * n_m[j] * tau_w + mu * tau_b) / taun
+      theta[j]<-rnorm(1, thetan, 1/sqrt(taun))
+    }
+    
+    #sample new value of tau_w
+    ss <- 0
+    for(j in 1:m){
+      ss <- ss + sum((y[ind == j] - theta[j])^2)
+    }
+    bn <- b0 + ss/2
+    tau_w <- rgamma(1, an, bn)
+    
+    #sample a new value of mu
+    gammam <- m * tau_b + gamma0
+    mum <- (mean(theta) * m * tau_b + mu0 * gamma0) / gammam
+    mu <- rnorm(1, mum, 1/ sqrt(gammam)) 
+    
+    # sample a new value of tau_b
+    etam <- eta0 + m/2
+    tm <- t0 + sum((theta-mu)^2)/2
+    tau_b <- rgamma(1, etam, tm)
+    
+    #store results
+    theta_mat[s,] <- theta
+    mat_store[s, ] <- c(mu, tau_w, tau_b)
+  }
+  colnames(mat_store) <- c("mu", "tau_w", "tau_b")
+  return(list(params = mat_store, theta = theta_mat))
+}
+
+
+business_neighborhood_open=subset(business_with_neighborhood,(!(business_with_neighborhood$neighborhood_indicator == 14
+                                                                |business_with_neighborhood$neighborhood_indicator == 38)) & is_open==1)
+
+multi_hierarchial_model=gibbs_sampler_multiple(business_neighborhood_open$stars, factor(business_neighborhood_open$neighborhood_indicator))
+apply(multi_hierarchial_model$params, 2, mean)
+apply(multi_hierarchial_model$params, 2, sd)
+mean(1/sqrt(multi_hierarchial_model$params[, 3]))
+sd(1/sqrt(multi_hierarchial_model$params[, 3]))
+theta_hat <- apply(multi_hierarchial_model$theta, 2, mean)
+ggplot(data.frame(size = tapply(business_neighborhood_open$stars, business_neighborhood_open$neighborhood, length), 
+                  theta_hat = theta_hat), aes(size, theta_hat)) + 
+  geom_point()+
+  ggtitle(MEAN_SAMPLE_RATING_VS_NUMBER_RESTAURANTS_NEIGHBORHOOD)

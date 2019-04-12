@@ -5,7 +5,8 @@ library("readr")
 library("MCMCpack")
 
 #DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
-PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/"
+#PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/"
+PATH="../dataset/"
 DATA_FOLDER="dataset/"
 DATA_PATH=paste(PATH,DATA_FOLDER,sep="")
 PLOT_FOLDER="visuals/"
@@ -205,6 +206,7 @@ ggplot(business_with_neighborhood, aes(stars)) + stat_bin(bins = 10)
 avg_size=data.frame(size=tapply(business_with_neighborhood$stars, 
            business_with_neighborhood$neighborhood, length))
 avg_size$neighborhood=row.names(avg_size)
+avg_restaurant_count_per_neighborhood <- mean(avg_size)
 avg_mean_rating=data.frame(mean_rating=tapply(business_with_neighborhood$stars, 
                 business_with_neighborhood$neighborhood, mean))
 avg_mean_rating$neighborhood=row.names(avg_mean_rating)

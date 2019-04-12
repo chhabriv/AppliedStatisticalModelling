@@ -4,9 +4,13 @@ library("readr")
 #install.packages("MCMCpack")
 library("MCMCpack")
 
-DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
-#DATA_PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/dataset/"
-VISUALS="visuals/"
+#DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
+PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/"
+DATA_FOLDER="dataset/"
+DATA_PATH=paste(PATH,DATA_FOLDER,sep="")
+PLOT_FOLDER="visuals/"
+VISUALS=paste(PATH,PLOT_FOLDER,sep="")
+NEIGHBORHOOD_MAPPING_FILENAME="NeighborhoodMapping.csv"
 BUSINESS_TORONTO_FILE="Business_Toronto_Restaurant.json"
 REVIEW_TORONTO="Review_Toronto_Restaurant.json"
 NEIGHBORHOOD_1="Scarborough"
@@ -16,6 +20,11 @@ NEIGHBORHOOD_COLUMN="neighborhood"
 CATEGORIES="categories"
 INDIAN_TAG="Indian"
 
+save_plot=function(title){
+  ggsave(filename=paste(title,".jpeg",sep=""),plot=last_plot(),
+         device="jpeg",path=VISUALS,width=12,height = 8,dpi=300)
+}
+
 INITIAL_MEAN=2.5
 INITIAL_VARIANCE=1.5625
 INITIAL_DIFFERENCE=0
@@ -24,11 +33,12 @@ B_0=1.6
 ITERATIONS=5000
 KAPPA=2
 
+NEIGHBORHOOD_RATING_DISTRIBUTION="NEIGHBORHOOD Vs RESTAURANT RATINGS"
 INDIA_NEIGHBORHOOD_DISTRIBUTION="INDIAN RESTAURANT RATING DISTRIBUTION PER NEIGHBORHOOD"
 INDIAN_NEIGHBORHOOD_RATING="INDIAN RESTAURANTS COUNT OF RATINGS PER NEIGHBORHOOD"
 HISTOGRAM_DIFF_SIM_NEIGHBORHOOD_RATINGS="INDIAN RESTAURANT SIMULATED RATING DIFFERENCE"
 MEAN_SAMPLE_RATING_VS_NUMBER_RESTAURANTS_NEIGHBORHOOD="MEAN RATING FROM SAMPLES VS NUMBER OF RESTAURANTS PER NEIGHBORHOOD"
-
+Y1SIM_VS_Y2SIM="Simulated ratings for Etobicoke(Y1) and Scarborough(Y2)"
 BUSINESS_TORONTO=paste(DATA_PATH,BUSINESS_TORONTO_FILE,sep = "")
 
 business = stream_in(file(BUSINESS_TORONTO))
@@ -46,7 +56,9 @@ restaurant_ratings$indicator <- as.numeric(factor(restaurant_ratings$neighborhoo
 neighborhood_vs_rating=as.data.frame(table(restaurant_ratings$neighborhood, 
                                            restaurant_ratings$stars,dnn = c(NEIGHBORHOOD_COLUMN, STARS_COLUMN)))
 ggplot(data=neighborhood_vs_rating,aes(neighborhood,stars))+
-  geom_point(aes(size = Freq))
+  geom_point(aes(size = Freq))+
+  ggtitle(NEIGHBORHOOD_RATING_DISTRIBUTION)
+save_plot(NEIGHBORHOOD_RATING_DISTRIBUTION,last_plot())
 
 class(business$categories)
 total_categories=unlist(business$categories)
@@ -69,18 +81,24 @@ for(i in c(1:nrow(business))){
 }
 }
 
-indian_restaurants=subset(business,IndianFlag==1 & (neighborhood==NEIGHBORHOOD_1 | neighborhood==NEIGHBORHOOD_2) & is_open==1)
+indian_restaurants=subset(business,IndianFlag==1 & 
+                            (neighborhood==NEIGHBORHOOD_1 | neighborhood==NEIGHBORHOOD_2) &
+                            is_open==1)
 
 ggplot(indian_restaurants) + geom_boxplot(aes(neighborhood, stars, fill = neighborhood)) + 
   geom_jitter(aes(neighborhood, stars, shape = neighborhood))+
-  ggtitle(INDIA_NEIGHBORHOOD_DISTRIBUTION)
+  ggtitle(INDIA_NEIGHBORHOOD_DISTRIBUTION)+
+  theme(plot.title = element_text(face="bold",hjust = 0.5))
+save_plot(INDIA_NEIGHBORHOOD_DISTRIBUTION)
 
 indian_neighborhood_vs_rating=as.data.frame(table(indian_restaurants$neighborhood, 
                                            indian_restaurants$stars,dnn = c(NEIGHBORHOOD_COLUMN, STARS_COLUMN)))
 
 ggplot(data=indian_neighborhood_vs_rating,aes(neighborhood,stars,col=neighborhood))+
   geom_point(aes(size = Freq))+
-  ggtitle(INDIAN_NEIGHBORHOOD_RATING)
+  ggtitle(INDIAN_NEIGHBORHOOD_RATING)+
+  theme(plot.title = element_text(face="bold",hjust = 0.5))
+save_plot(INDIAN_NEIGHBORHOOD_RATING)
 
 tapply(indian_restaurants$stars, indian_restaurants$neighborhood, mean)
 tapply(indian_restaurants$stars, indian_restaurants$neighborhood, median)
@@ -149,13 +167,21 @@ sd(1/sqrt(hierarchial_model[, 3]))
 y1_sim <- rnorm(ITERATIONS, hierarchial_model[, 1] + hierarchial_model[, 2], sd = 1/sqrt(hierarchial_model[, 3]))
 y2_sim <- rnorm(ITERATIONS, hierarchial_model[, 1] - hierarchial_model[, 2], sd = 1/sqrt(hierarchial_model[, 3]))
 
-ggplot(data.frame(y_sim_diff=y1_sim - y2_sim)) + stat_bin(aes(y1_sim - y2_sim),bins=12)+
-  ggtitle(HISTOGRAM_DIFF_SIM_NEIGHBORHOOD_RATINGS)#CHANGE COLOR AND ADD BOUNDARY
+ggplot(data.frame(y_sim_diff=y1_sim - y2_sim)) + 
+  stat_bin(aes(y1_sim - y2_sim),bins=12,fill="#619CFF",color="black")+
+  ggtitle(HISTOGRAM_DIFF_SIM_NEIGHBORHOOD_RATINGS)+
+  theme(plot.title = element_text(face="bold",hjust = 0.5))
+save_plot(HISTOGRAM_DIFF_SIM_NEIGHBORHOOD_RATINGS)
 
 mean(y1_sim > y2_sim)
 
-ggplot(data.frame(y1_sim, y2_sim)) + geom_point(aes(y1_sim, y2_sim,col=TRUE, alpha = 0.3))+geom_abline(slope = 1, intercept = 0)
-
+ggplot(data.frame(y1_sim, y2_sim)) + 
+  geom_point(aes(y1_sim, y2_sim, alpha = 0.3, colour = y1_sim)) +
+  geom_abline(slope = 1, intercept = 0)+
+  theme(plot.title = element_text(face="bold",hjust = 0.5),
+        legend.position = "none")+
+  ggtitle(Y1SIM_VS_Y2SIM)
+save_plot(Y1SIM_VS_Y2SIM)
 
 #Multiple Models
 business_with_neighborhood=subset(business,business$neighborhood!="")
@@ -164,9 +190,15 @@ business_with_neighborhood$neighborhood_indicator = as.numeric(factor(business_w
 ggplot(business_with_neighborhood) + 
   geom_boxplot(aes(x = reorder(neighborhood_indicator, stars, median), 
                                     stars, 
-                                    fill = reorder(neighborhood_indicator, stars, median)), show.legend=FALSE)
+                                    fill = reorder(neighborhood_indicator, stars, median)), 
+               show.legend=FALSE)
+
 ggplot(business_with_neighborhood, 
        aes(x = reorder(neighborhood_indicator, stars, length))) + stat_count()
+write.csv(unique(data.frame("Neighborhood"=business_with_neighborhood$neighborhood,
+                       "Neighborhood Code"=business_with_neighborhood$neighborhood_indicator,
+                       check.names = FALSE)),
+          paste(DATA_FOLDER,NEIGHBORHOOD_MAPPING_FILENAME,sep=""))
 
 ggplot(business_with_neighborhood, aes(stars)) + stat_bin(bins = 10)
 

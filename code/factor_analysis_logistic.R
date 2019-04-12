@@ -9,7 +9,7 @@ library("VIM")
 library("glmnet")
 library("caret")
 
-DATA_PATH="~/code/AppliedStatisticalModelling/Assignment3/dataset/"
+DATA_PATH="../dataset/"
 #DATA_PATH="H:/TCD/Semester 2/AppliedStatisticalModelling/Assignments/Assignment3/Yelp-Dataset-Statistical-Modelling/dataset/"
 VISUALS="visuals/"
 BUSINESS_TORONTO_FILE="Business_Toronto_Restaurant.json"
@@ -44,6 +44,12 @@ get_missing_count=function(dataframe){
   missing_filtered
 }
 
+save_plot=function(title){
+  ggsave(filename=paste(title,".jpeg",sep=""),plot=last_plot(),
+         device="jpeg",path=VISUALS,width=12,height = 8,dpi=300)
+}
+
+
 business = stream_in(file(BUSINESS_TORONTO),flatten=TRUE)
 review= stream_in(file(REVIEWS_TORONTO))
 mean_count_reviews = review%>% 
@@ -53,7 +59,10 @@ business_review_merge=merge(business,mean_count_reviews,by.x="business_id",by.y=
 
 business_review_merge[business_review_merge==""]  <- NA 
 
-ggplot(business_review_merge) + stat_bin(aes(business_review_merge$review_count),bins=100)
+ggplot(business_review_merge) + stat_bin(aes(business_review_merge$review_count),bins=100,fill="#619CFF",color="black")+
+  ggtitle("Frequency of count of review for restaurant")+
+  theme(plot.title = element_text(face="bold",hjust = 0.5))
+save_plot("Frequency of count of review for restaurant")
 
 missing_count_merged=get_missing_count(business_review_merge)
 View(missing_count_merged)
